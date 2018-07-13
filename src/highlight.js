@@ -4,21 +4,27 @@ class Highlight {
         this.el = el;
         this.key = `mark-${uuid()}`;
     }
-    updateConfig (binding) {
+    validateCfg (binding) {
         let cfg = Object.assign(this.cfg || {caseSensitive: false, class: []}, binding.value);
         if (!cfg.keyword || !cfg.keyword.length) {
-            throw new Error('keyword must be not null');
+            return false;
         }
         cfg.class = Array.from(cfg.class);
         cfg.keyword = Array.from(cfg.keyword).filter(k => k.length);
+        if (!cfg.keyword.length) {
+            return false;
+        }
         // 最小的关键字长度(减少不必要的匹配)
         cfg.minLength = Math.max(...cfg.keyword.map(word => word ? word.length : 0));
         // 生成正则
         cfg.regex = new RegExp(`(${cfg.keyword.map(word => word.replace(/[-\\^$*+?.()|[\]{}/]/g, '\\$&')).join('|')})`, cfg.caseSensitive ? 'g' : 'ig');
         this.cfg = cfg;
+        return true;
     }
     apply (binding) {
-        this.updateConfig(binding);
+        if (!this.validateCfg(binding)) {
+            return;
+        }
         this.findNodes().filter(node => node.textContent.length >= this.cfg.minLength).forEach(node => {
             let mark = document.createElement('mark');
             mark.innerHTML = node.textContent.replace(this.cfg.regex, `<mark data-mark-key="${this.key}" class="${this.cfg.class.join(' ')}">$1</mark>`);
@@ -27,7 +33,9 @@ class Highlight {
         });
     }
     remove (binding) {
-        this.updateConfig(binding);
+        if (!this.validateCfg(binding)) {
+            return;
+        }
         this.el.querySelectorAll(`mark[data-mark-key=${this.key}]`).forEach(item => {
             let parent = item.parentNode;
             parent.replaceChild(item.firstChild, item);
